@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>UEP HealthTrack - Book</title>
+    <title>UEP HealthTrack - Book Appointment</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="main.css">
 </head>
@@ -24,13 +24,59 @@
         <div class="page-title-group"><h1>BOOK NEW <br>APPOINTMENT</h1><div class="title-accent-line"></div></div>
         <div class="content-wrapper">
             <form class="appointment-form" id="bookingForm">
-                <div class="form-row"><div class="form-group"><label>Last Name</label><input type="text" id="lastName" required></div><div class="form-group"><label>First Name</label><input type="text" id="firstName" required></div></div>
-                <div class="form-group"><label>Student ID</label><input type="text" id="studentID" required></div>
-                <div class="form-group"><label>Reason</label><textarea id="reason" class="reason-box"></textarea></div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <input type="text" id="lastName" readonly style="background-color: #e9ecef;">
+                    </div>
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <input type="text" id="firstName" readonly style="background-color: #e9ecef;">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Middle Name</label>
+                        <input type="text" id="middleName" readonly style="background-color: #e9ecef;" placeholder="No Middle Name">
+                    </div>
+                    <div class="form-group">
+                        <label>Student ID</label>
+                        <input type="text" id="studentID" readonly style="background-color: #e9ecef;">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Reason for Visit</label>
+                    <select id="reason" class="reason-box" style="cursor: pointer;">
+                        <option value="" disabled selected>-- Select a Reason --</option>
+                        <option value="Medical Consultation">Medical Consultation (Check-up)</option>
+                        <option value="Dental Checkup">Dental Checkup / Cleaning</option>
+                        <option value="Medical Certificate">Medical Certificate (Enrollment/OJT)</option>
+                        <option value="Laboratory Request">Laboratory Request / Results</option>
+                        <option value="First Aid">First Aid / Minor Injury</option>
+                        <option value="Follow-up Checkup">Follow-up Checkup</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <input type="text" id="otherReason" placeholder="Please specify your reason..." style="display:none; margin-top:10px; border-color: var(--uep-orange);" class="reason-box">
+                </div>
+                
                 <div class="calendar-section">
                     <h2 style="color:var(--uep-blue); text-align:center;">Select Date</h2>
-                    <div class="calendar-card"><div class="calendar-header"><button type="button" id="prevMonth" class="nav-btn">&#10094;</button><h3 id="currentMonthYear"></h3><button type="button" id="nextMonth" class="nav-btn">&#10095;</button></div><div class="calendar-grid" id="calendarGrid"></div></div>
+                    <div class="calendar-card">
+                        <div class="calendar-header">
+                            <button type="button" id="prevMonth" class="nav-btn">&#10094;</button>
+                            <h3 id="currentMonthYear"></h3>
+                            <button type="button" id="nextMonth" class="nav-btn">&#10095;</button>
+                        </div>
+                        
+                        <div class="calendar-days-header"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+                        
+                        <div class="calendar-grid" id="calendarGrid"></div>
+                    </div>
                 </div>
+
                 <div style="margin-top:20px;">
                     <p>Selected Date: <strong id="selectedDateDisplay" style="color:var(--uep-orange);">None</strong></p>
                     <h3 style="margin-top:15px; font-size:16px;">Select Time:</h3>
