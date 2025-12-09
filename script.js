@@ -4,36 +4,63 @@ document.addEventListener('DOMContentLoaded', function() {
     const MAX_SLOTS = 10;
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     
-    // Today (Midnight)
     const today = new Date();
     today.setHours(0, 0, 0, 0); 
     const todayString = `${monthNames[today.getMonth()]} ${today.getDate()}, ${today.getFullYear()}`;
 
-    // PH Holidays 2025 (Month-Day)
-    const holidays = ["1-1", "1-29", "2-25", "4-9", "4-17", "4-18", "4-19", "5-1", "6-12", "8-21", "8-25", "11-1", "11-2", "11-30", "12-8", "12-24", "12-25", "12-30", "12-31"];
+    // --- PH HOLIDAYS (Fixed Dates: Month-Day) ---
+    const phHolidays = [
+        "0-1",   // Jan 1: New Year
+        "1-25",  // Feb 25: EDSA Revolution
+        "3-9",   // Apr 9: Araw ng Kagitingan
+        "4-1",   // May 1: Labor Day
+        "5-12",  // Jun 12: Independence Day
+        "7-21",  // Aug 21: Ninoy Aquino Day
+        "7-26",  // Aug 26: National Heroes Day
+        "10-1",  // Nov 1: All Saints' Day
+        "10-2",  // Nov 2: All Souls' Day
+        "10-30", // Nov 30: Bonifacio Day
+        "11-8",  // Dec 8: Feast of Immaculate Conception
+        "11-24", // Dec 24: Christmas Eve
+        "11-25", // Dec 25: Christmas Day
+        "11-30", // Dec 30: Rizal Day
+        "11-31"  // Dec 31: New Year's Eve
+    ];
+
+    // --- SESSION HELPER ---
+    function getSessionUser() {
+        const u = localStorage.getItem('uep_current_session_user');
+        const users = JSON.parse(localStorage.getItem('uep_all_users')) || {};
+        return users[u];
+    }
+
+    function formatTextDate(dateStr) {
+        if (!dateStr || dateStr === "No Birthday" || dateStr === "Update Required") return "Update Required";
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr; 
+        return `${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    }
 
     // --- STATS ---
     let stats = JSON.parse(localStorage.getItem('uep_clinic_stats')) || { pending: 0, todayCount: 0, allTime: 0, lastDate: todayString };
     if (stats.lastDate !== todayString) {
-        stats.todayCount = 0; 
-        stats.lastDate = todayString;
+        stats.todayCount = 0; stats.lastDate = todayString;
         localStorage.setItem('uep_clinic_stats', JSON.stringify(stats));
     }
     const statPending = document.getElementById('statPending');
-    const statToday = document.getElementById('statToday');
-    const statAllTime = document.getElementById('statAllTime');
     if (statPending) {
         statPending.innerText = stats.pending;
-        statToday.innerText = stats.todayCount;
-        statAllTime.innerText = stats.allTime.toLocaleString();
+        document.getElementById('statToday').innerText = stats.todayCount;
+        document.getElementById('statAllTime').innerText = stats.allTime.toLocaleString();
     }
 
     function getSlotCounts() { return JSON.parse(localStorage.getItem('uep_slot_counts')) || {}; }
 
-    // --- AUTH ---
+    // --- AUTH LOGOUT ---
     const profileLogout = document.getElementById('logoutBtn');
     if(profileLogout) profileLogout.addEventListener('click', () => { localStorage.removeItem('uep_current_session_user'); window.location.href = 'login.html'; });
 
+    // --- LOGIN FORM ---
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         if(localStorage.getItem('uep_current_session_user')) { window.location.href = 'home.html'; }
@@ -49,65 +76,134 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- REGISTER FORM ---
     const regForm = document.getElementById('registerForm');
     if(regForm) {
         regForm.addEventListener('submit', function(e) {
             e.preventDefault();
+            const fName = document.getElementById('regFName').value.trim();
+            const mName = document.getElementById('regMName').value.trim();
+            const lName = document.getElementById('regLName').value.trim();
+            const suffix = document.getElementById('regSuffix').value.trim();
+            
+            let fullName = `${fName} ${mName} ${lName}`;
+            if(suffix) fullName += ` ${suffix}`;
+
             const u = document.getElementById('regUsername').value;
             const p = document.getElementById('regPassword').value;
-            const fName = document.getElementById('regName').value;
+            const course = document.getElementById('regCourse').value;
             const id = document.getElementById('regID').value;
+            const email = document.getElementById('regEmail') ? document.getElementById('regEmail').value : "No Email";
+            
+            const bday = "No Birthday";
+
             let allUsers = JSON.parse(localStorage.getItem('uep_all_users')) || {};
             if(allUsers[u]) { alert("Username taken"); return; }
+            
             allUsers[u] = { 
-                username: u, password: p, fullName: fName, id: id, 
-                email: "No Email", course: "No Course", address: "Catarman, N. Samar", birthday: "No Birthday",
-                initials: fName.charAt(0).toUpperCase(), date: null, time: null, reason: "" 
+                username: u, 
+                password: p, 
+                firstName: fName,   
+                middleName: mName,  
+                lastName: lName,    
+                suffix: suffix,     
+                fullName: fullName, 
+                id: id, 
+                course: course, 
+                address: "", 
+                birthday: bday, 
+                email: email,
+                initials: fName.charAt(0).toUpperCase(), 
+                date: null, time: null, reason: "" 
             };
+            
             localStorage.setItem('uep_all_users', JSON.stringify(allUsers));
-            alert("Account Created!"); window.location.href = 'login.html';
+            alert("Account Created! Please login.");
+            window.location.href = 'login.html';
         });
     }
 
-    // --- BOOKING LOGIC ---
+    // --- BOOKING / APPOINTMENT FORM ---
     const bookingForm = document.getElementById('bookingForm');
     if (bookingForm) {
+        const currentUser = getSessionUser();
+        
+        if(currentUser) {
+            const fNameInput = document.getElementById('firstName');
+            const mNameInput = document.getElementById('middleName'); 
+            const lNameInput = document.getElementById('lastName');
+            const sIDInput = document.getElementById('studentID');
+
+            if(fNameInput) {
+                if (currentUser.firstName) {
+                    let displayFirst = currentUser.firstName;
+                    if(currentUser.suffix) displayFirst += " " + currentUser.suffix;
+                    fNameInput.value = displayFirst;
+                } else { fNameInput.value = currentUser.fullName; }
+                fNameInput.readOnly = true; 
+            }
+            if(mNameInput) {
+                mNameInput.value = currentUser.middleName ? currentUser.middleName : "";
+                mNameInput.readOnly = true; 
+            }
+            if(lNameInput) {
+                lNameInput.value = currentUser.lastName ? currentUser.lastName : "";
+                lNameInput.readOnly = true; 
+            }
+            if(sIDInput) {
+                sIDInput.value = currentUser.id;
+                sIDInput.readOnly = true;
+            }
+        }
+
+        // --- "OTHER" REASON TOGGLE LOGIC ---
+        const reasonSelect = document.getElementById('reason');
+        const otherReasonInput = document.getElementById('otherReason');
+        if (reasonSelect && otherReasonInput) {
+            reasonSelect.addEventListener('change', function() {
+                if (this.value === "Other") {
+                    otherReasonInput.style.display = "block";
+                    otherReasonInput.focus();
+                } else {
+                    otherReasonInput.style.display = "none";
+                    otherReasonInput.value = ""; // Clear it if they switch back
+                }
+            });
+        }
+        // -----------------------------------
+
         const calendarGrid = document.getElementById('calendarGrid');
         let selectedDateText = "";
         let selectedTimeText = "";
 
-        function updateTimeButtons(dateKey) {
-            const counts = getSlotCounts();
-            const dateData = counts[dateKey] || {};
-            document.querySelectorAll('.time-btn').forEach(btn => {
-                const timeKey = btn.getAttribute('data-time');
-                const current = dateData[timeKey] || 0;
-                const span = btn.querySelector('.btn-count-text');
-                if(span) span.innerText = `${current}/${MAX_SLOTS} slots`;
-                if (current >= MAX_SLOTS) {
-                    btn.disabled = true; btn.classList.remove('selected');
-                    btn.style.backgroundColor = "#e0e0e0"; btn.style.borderColor = "#ccc";
-                } else {
-                    btn.disabled = false; btn.style.backgroundColor = ""; btn.style.borderColor = "";
-                }
-            });
-        }
-
-        if(calendarGrid) {
+        // === CALENDAR LOGIC START ===
+        function initCalendar() {
+            const calendarGrid = document.getElementById('calendarGrid');
             const monthLabel = document.getElementById('currentMonthYear');
             const prevBtn = document.getElementById('prevMonth');
             const nextBtn = document.getElementById('nextMonth');
+            
             let currentViewDate = new Date();
 
-            function renderCalendar(date) {
+            function render(date) {
                 calendarGrid.innerHTML = '';
                 const year = date.getFullYear();
                 const month = date.getMonth();
-                monthLabel.innerText = `${monthNames[month]} ${year}`;
+                if(monthLabel) monthLabel.innerText = `${monthNames[month]} ${year}`;
+                
                 const daysInMonth = new Date(year, month + 1, 0).getDate();
                 const firstDayIndex = new Date(year, month, 1).getDay();
-                const daysInRealMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-                const isBookingWindowOpen = today.getDate() >= (daysInRealMonth - 2);
+
+                const lastDayOfCurrentMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                const thresholdDate = new Date(lastDayOfCurrentMonth);
+                thresholdDate.setDate(lastDayOfCurrentMonth.getDate() - 2);
+
+                let maxAllowedBookingDate;
+                if (today >= thresholdDate) {
+                    maxAllowedBookingDate = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+                } else {
+                    maxAllowedBookingDate = lastDayOfCurrentMonth;
+                }
 
                 for (let x = firstDayIndex; x > 0; x--) { 
                     const spacer = document.createElement('div');
@@ -118,23 +214,33 @@ document.addEventListener('DOMContentLoaded', function() {
                     let day = document.createElement('div');
                     day.className = 'calendar-day';
                     day.innerText = i;
+                    
                     const checkDate = new Date(year, month, i);
                     checkDate.setHours(0,0,0,0);
-                    const dayOfWeek = checkDate.getDay(); 
-                    const dateString = `${month + 1}-${i}`;
 
-                    let isDisabled = false;
-                    let tooltip = "";
+                    // 1. Disable Past Dates
+                    let isDisabled = checkDate < today;
 
-                    if (checkDate < today) { isDisabled = true; tooltip = "Past Date"; }
-                    else if (dayOfWeek === 0 || dayOfWeek === 6) { isDisabled = true; tooltip = "Clinic Closed (Weekend)"; }
-                    else if (holidays.includes(dateString)) { isDisabled = true; tooltip = "Holiday"; }
-                    else if (checkDate.getMonth() !== today.getMonth()) {
-                        if (!isBookingWindowOpen) { isDisabled = true; tooltip = "Next month booking not yet open."; }
+                    // 2. Disable Weekends (0 = Sunday, 6 = Saturday)
+                    if (checkDate.getDay() === 0 || checkDate.getDay() === 6) {
+                        isDisabled = true;
                     }
 
-                    if (isDisabled) { day.classList.add('disabled'); day.title = tooltip; }
-                    else {
+                    // 3. Disable PH Holidays
+                    const holidayKey = `${checkDate.getMonth()}-${checkDate.getDate()}`; 
+                    if (phHolidays.includes(holidayKey)) {
+                        isDisabled = true;
+                        day.title = "Holiday"; 
+                    }
+
+                    // 4. Disable Dates beyond the Allowed Booking Window
+                    if (checkDate > maxAllowedBookingDate) {
+                        isDisabled = true;
+                    }
+
+                    if (isDisabled) {
+                        day.classList.add('disabled');
+                    } else {
                         day.onclick = function() {
                             document.querySelectorAll('.calendar-day').forEach(d => d.classList.remove('selected'));
                             this.classList.add('selected');
@@ -142,17 +248,38 @@ document.addEventListener('DOMContentLoaded', function() {
                             document.getElementById('selectedDateDisplay').innerText = selectedDateText;
                             document.getElementById('slotStatusDisplay').style.display = 'none';
                             selectedTimeText = "";
-                            document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('selected'));
+                            document.querySelectorAll('.time-btn').forEach(b => {
+                                b.classList.remove('selected');
+                                b.disabled = false; b.style.backgroundColor = "";
+                            });
                             updateTimeButtons(selectedDateText);
                         };
                     }
                     calendarGrid.appendChild(day);
                 }
             }
-            renderCalendar(currentViewDate);
-            prevBtn.addEventListener('click', () => { currentViewDate.setMonth(currentViewDate.getMonth() - 1); renderCalendar(currentViewDate); });
-            nextBtn.addEventListener('click', () => { currentViewDate.setMonth(currentViewDate.getMonth() + 1); renderCalendar(currentViewDate); });
+            
+            render(currentViewDate);
+            prevBtn.onclick = () => { currentViewDate.setMonth(currentViewDate.getMonth() - 1); render(currentViewDate); };
+            nextBtn.onclick = () => { currentViewDate.setMonth(currentViewDate.getMonth() + 1); render(currentViewDate); };
         }
+        // === CALENDAR LOGIC END ===
+
+        function updateTimeButtons(dateKey) {
+            const counts = getSlotCounts();
+            const dateData = counts[dateKey] || {};
+            document.querySelectorAll('.time-btn').forEach(btn => {
+                const timeKey = btn.getAttribute('data-time');
+                const current = dateData[timeKey] || 0;
+                const span = btn.querySelector('.btn-count-text');
+                if(span) span.innerText = `${current}/${MAX_SLOTS} slots`;
+                if (current >= MAX_SLOTS) {
+                    btn.disabled = true; btn.style.backgroundColor = "#ccc";
+                }
+            });
+        }
+
+        initCalendar();
 
         document.querySelectorAll('.time-btn').forEach(btn => {
             btn.addEventListener('click', function() {
@@ -163,78 +290,99 @@ document.addEventListener('DOMContentLoaded', function() {
                 selectedTimeText = this.getAttribute('data-time');
                 const counts = getSlotCounts();
                 const currentCount = (counts[selectedDateText] && counts[selectedDateText][selectedTimeText]) || 0;
-                const percentage = (currentCount / MAX_SLOTS) * 100;
-                const statusBox = document.getElementById('slotStatusDisplay');
-                statusBox.style.display = 'block';
-                document.getElementById('statusTextContent').innerText = `${currentCount} / ${MAX_SLOTS} Slots Taken (${Math.round(percentage)}%)`;
-                const fill = document.getElementById('progressBarFill');
-                fill.style.width = `${percentage}%`;
-                if(percentage < 50) fill.style.backgroundColor = "#1a45a8";
-                else if(percentage < 90) fill.style.backgroundColor = "#ffa50c";
-                else fill.style.backgroundColor = "#ff4d4d";
+                const pct = (currentCount / MAX_SLOTS) * 100;
+                document.getElementById('slotStatusDisplay').style.display = 'block';
+                document.getElementById('statusTextContent').innerText = `${currentCount} / ${MAX_SLOTS} Slots Taken (${Math.round(pct)}%)`;
+                document.getElementById('progressBarFill').style.width = `${pct}%`;
             });
         });
 
+        // === SUBMIT LOGIC ===
         document.getElementById('confirmBtn').addEventListener('click', function() {
-            const fName = document.getElementById('firstName').value;
-            const lName = document.getElementById('lastName').value;
-            const studentID = document.getElementById('studentID').value;
-            const reason = document.getElementById('reason').value;
-            if(!fName || !studentID || !selectedDateText || !selectedTimeText) { alert("Please complete the form."); return; }
+            let reasonVal = document.getElementById('reason').value.trim();
+            const otherVal = document.getElementById('otherReason').value.trim();
+            
+            // Check if user actually selected something
+            if(!reasonVal) { 
+                alert("Please select a reason for your appointment."); 
+                return; 
+            }
+
+            // If "Other" is selected, require the text box
+            if (reasonVal === "Other") {
+                if (!otherVal) {
+                    alert("Please specify your reason in the text box.");
+                    document.getElementById('otherReason').focus();
+                    return;
+                }
+                reasonVal = `Other: ${otherVal}`; // Save as "Other: My Reason"
+            }
+
+            // Check Date/Time
+            if(!selectedDateText || !selectedTimeText) { 
+                alert("Please select Date and Time."); 
+                return; 
+            }
 
             let counts = getSlotCounts();
             if(!counts[selectedDateText]) counts[selectedDateText] = {};
             if(!counts[selectedDateText][selectedTimeText]) counts[selectedDateText][selectedTimeText] = 0;
-            if(counts[selectedDateText][selectedTimeText] >= MAX_SLOTS) { alert("Slot full. Please pick another."); updateTimeButtons(selectedDateText); return; }
+            if(counts[selectedDateText][selectedTimeText] >= MAX_SLOTS) { alert("Slot Full."); return; }
 
             counts[selectedDateText][selectedTimeText]++;
             localStorage.setItem('uep_slot_counts', JSON.stringify(counts));
 
-            let allUsers = JSON.parse(localStorage.getItem('uep_all_users')) || {};
-            let sessionUser = localStorage.getItem('uep_current_session_user');
-            if(sessionUser && allUsers[sessionUser]) {
-                allUsers[sessionUser].fullName = `${fName} ${lName}`;
-                allUsers[sessionUser].id = studentID;
-                allUsers[sessionUser].date = selectedDateText;
-                allUsers[sessionUser].time = selectedTimeText;
-                allUsers[sessionUser].reason = reason;
-                localStorage.setItem('uep_all_users', JSON.stringify(allUsers));
-            }
+            let allUsers = JSON.parse(localStorage.getItem('uep_all_users'));
+            let sUser = localStorage.getItem('uep_current_session_user');
+            
+            allUsers[sUser].date = selectedDateText;
+            allUsers[sUser].time = selectedTimeText;
+            allUsers[sUser].reason = reasonVal; // Save the validated reason
+            localStorage.setItem('uep_all_users', JSON.stringify(allUsers));
+
             stats.pending++; stats.allTime++;
-            if(selectedDateText === todayString) { stats.todayCount++; }
+            if(selectedDateText === todayString) stats.todayCount++;
             localStorage.setItem('uep_clinic_stats', JSON.stringify(stats));
+
             alert("Appointment Set!"); window.location.href = 'profile.html';
         });
     }
 
-    // --- PROFILE ---
+    // --- PROFILE & EDIT ---
     const dispName = document.getElementById('dispName');
     if(dispName) {
         const sessionUser = localStorage.getItem('uep_current_session_user');
         if(!sessionUser) { window.location.href = 'login.html'; return; }
         let allUsers = JSON.parse(localStorage.getItem('uep_all_users')) || {};
         let user = allUsers[sessionUser];
+        
         if(user) {
             document.getElementById('dispName').innerText = user.fullName;
             document.getElementById('dispID').innerText = user.id;
             document.querySelector('.profile-avatar').innerText = user.initials;
             document.getElementById('dispEmail').innerText = user.email || "---";
             document.getElementById('dispCourse').innerText = user.course || "---";
-            document.getElementById('dispAddress').innerText = user.address || "---";
-            document.getElementById('dispBirthday').innerText = user.birthday || "---";
+            
+            const addr = user.address && user.address !== "" ? user.address : "Update Required";
+            const bdayRaw = user.birthday && user.birthday !== "" && user.birthday !== "No Birthday" ? user.birthday : "Update Required";
+            
+            document.getElementById('dispAddress').innerText = addr;
+            document.getElementById('dispBirthday').innerText = formatTextDate(bdayRaw);
+
+            if(addr === "Update Required") document.getElementById('dispAddress').style.color = "red";
+            if(bdayRaw === "Update Required") document.getElementById('dispBirthday').style.color = "red";
 
             if(user.date) {
                 document.getElementById('dispDate').innerText = `${user.date} @ ${user.time}`;
                 document.getElementById('dispReason').innerText = user.reason;
             } else { document.getElementById('dispDate').innerText = "No Appointment"; }
 
-            // History
             const historyBody = document.getElementById('recentVisitsBody');
             if(historyBody) {
                 if (user.history && user.history.length > 0) {
                     historyBody.innerHTML = "";
                     user.history.forEach(visit => {
-                        historyBody.innerHTML += `<tr><td>${visit.date}</td><td>${visit.reason}</td><td class="status-completed">Completed</td></tr>`;
+                        historyBody.innerHTML += `<tr><td>${visit.date}</td><td>${visit.reason}</td><td class="status-completed" style="color:orange;">Pending</td></tr>`;
                     });
                 } else {
                     if(user.date) historyBody.innerHTML = `<tr><td>${user.date}</td><td>${user.reason}</td><td style="color:#ffa50c; font-weight:bold;">Upcoming</td></tr>`;
@@ -243,7 +391,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Edit
         const editBtn = document.getElementById('editProfileBtn');
         const modal = document.getElementById('editModal');
         const cancelBtn = document.getElementById('cancelEditBtn');
@@ -251,16 +398,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if(editBtn) {
             editBtn.addEventListener('click', () => {
                 document.getElementById('editName').value = user.fullName;
-                document.getElementById('editEmail').value = user.email || "";
-                document.getElementById('editCourse').value = user.course || "";
-                document.getElementById('editAddress').value = user.address || "";
-                document.getElementById('editBirthday').value = user.birthday || "";
+                document.getElementById('editID').value = user.id;
+                document.getElementById('editCourse').value = user.course;
+                document.getElementById('editEmail').value = user.email;
+                document.getElementById('editAddress').value = user.address;
+                document.getElementById('editBirthday').value = (user.birthday === "No Birthday") ? "" : user.birthday;
                 modal.classList.add('active');
             });
             cancelBtn.addEventListener('click', () => { modal.classList.remove('active'); });
             editForm.addEventListener('submit', (e) => {
                 e.preventDefault();
-                user.fullName = document.getElementById('editName').value;
                 user.email = document.getElementById('editEmail').value;
                 user.course = document.getElementById('editCourse').value;
                 user.address = document.getElementById('editAddress').value;
